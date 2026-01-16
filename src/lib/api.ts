@@ -1,78 +1,52 @@
-const API_BASE_URL = 'http://localhost:3001';
+import { httpsCallable } from "firebase/functions";
+import { getFunctions } from "firebase/functions";
+import { app } from "./firebase";
 
-// Mock authentication - get current user from localStorage
-const getCurrentUser = () => {
-  const storedUser = localStorage.getItem('mockUser');
-  if (storedUser) {
-    return JSON.parse(storedUser);
-  }
-  // Fallback for demo
-  return {
-    uid: 'user1',
-    email: 'siddiqshaik613@gmail.com'
-  };
-};
+const functions = getFunctions(app);
 
 class ApiService {
-  private async makeRequest(endpoint: string, data?: any): Promise<any> {
-    const currentUser = getCurrentUser();
-
+  private async callFunction(functionName: string, data?: Record<string, unknown>): Promise<Record<string, unknown>> {
     try {
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...data,
-          userId: currentUser.uid,
-          userEmail: currentUser.email
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      return await response.json();
+      const callable = httpsCallable(functions, functionName);
+      const result = await callable(data);
+      return result.data as Record<string, unknown>;
     } catch (error) {
-      console.error('API request failed:', error);
+      console.error(`Firebase function ${functionName} failed:`, error);
       throw error;
     }
   }
 
   // User Management
   async setUserRole(role: string = 'user') {
-    return this.makeRequest('/functions/setUserRole', { role });
+    return this.callFunction('setUserRole', { role });
   }
 
   async getUserProfile() {
-    return this.makeRequest('/functions/getUserProfile');
+    return this.callFunction('getUserProfile');
   }
 
   // Password Strength
   async checkPasswordStrength(password: string) {
-    return this.makeRequest('/functions/checkPasswordStrength', { password });
+    return this.callFunction('checkPasswordStrength', { password });
   }
 
   // Phishing Detection
   async submitPhishingURL(url: string) {
-    return this.makeRequest('/functions/submitPhishingURL', { url });
+    return this.callFunction('submitPhishingURL', { url });
   }
 
   async getUserPhishingSubmissions() {
-    return this.makeRequest('/functions/getUserPhishingSubmissions');
+    return this.callFunction('getUserPhishingSubmissions');
   }
 
   // Malware Detection
   async submitMalwareCheck(fileName?: string, fileHash?: string) {
-    return this.makeRequest('/functions/submitMalwareCheck', { fileName, fileHash });
+    return this.callFunction('submitMalwareCheck', { fileName, fileHash });
   }
 
   async getUserMalwareSubmissions() {
-    return this.makeRequest('/functions/getUserMalwareSubmissions');
+    return this.callFunction('getUserMalwareSubmissions');
   }
 }
 
 export const apiService = new ApiService();
-export { getCurrentUser };

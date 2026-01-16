@@ -9,6 +9,8 @@ import Navbar from "@/components/layout/Navbar";
 import ParticleBackground from "@/components/effects/ParticleBackground";
 import PageTransition from "@/components/layout/PageTransition";
 import GlassCard from "@/components/cards/GlassCard";
+import { apiService } from "@/lib/api";
+import { toast } from "sonner";
 
 interface ScanResult {
   status: "SAFE" | "PHISHING";
@@ -181,43 +183,45 @@ const PhishingCheck = () => {
     }
   };
 
-  // Local phishing detection (frontend-only)
-  async function checkPhishingLocally(url: string): Promise<ScanResult> {
-    // Simulate processing time for better UX
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    return analyzeURL(url);
-  }
-
   const handleScan = async () => {
-    if (!url) return;
+    if (!url.trim()) {
+      toast.error("Please enter a URL to scan");
+      return;
+    }
 
     setIsScanning(true);
     setResult(null);
-    setProgress(0); // Reset progress to 0 when starting
+    setProgress(0);
 
-    try {
-      // Run local phishing detection (frontend-only)
-      const scanResult = await checkPhishingLocally(url);
-      setResult(scanResult);
-      setProgress(scanResult.riskScore); // Set final progress
-    } catch (error) {
-      console.error("Scan failed:", error);
-      setResult({
-        status: 'PHISHING',
-        riskScore: 100,
-        riskLevel: 'Very High Risk',
-        analysis: {
-          domain: 'Error',
-          protocol: 'Error',
-          hasHttps: false,
-          suspiciousPatterns: ['Analysis failed'],
-          legitimateIndicators: [],
-          recommendations: ['Please try again']
-        }
-      });
-    }
+    // Simulate processing time for better UX
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
+    const scanResult = analyzeURL(url.trim());
+    setResult(scanResult);
+    setProgress(scanResult.riskScore);
     setIsScanning(false);
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'SAFE':
+        return <CheckCircle className="w-6 h-6 text-green-500" />;
+      case 'PHISHING':
+        return <XCircle className="w-6 h-6 text-red-500" />;
+      default:
+        return <AlertCircle className="w-6 h-6 text-yellow-500" />;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'SAFE':
+        return 'text-green-600 bg-green-50 border-green-200';
+      case 'PHISHING':
+        return 'text-red-600 bg-red-50 border-red-200';
+      default:
+        return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+    }
   };
 
   return (
@@ -247,146 +251,188 @@ const PhishingCheck = () => {
             animate={{ opacity: 1, y: 0 }}
             className="text-center mb-8"
           >
-            <div className="w-16 h-16 rounded-xl bg-secondary/20 flex items-center justify-center mx-auto mb-4">
-              <Globe className="w-8 h-8 text-secondary" />
-            </div>
-            <h1 className="text-3xl font-bold mb-2">URL Security Scanner</h1>
-            <p className="text-muted-foreground">
-              Enter a URL to check if it's safe or potentially malicious
+            <h1 className="text-4xl font-bold text-gradient-cyber mb-4">
+              URL Security Scanner
+            </h1>
+            <p className="text-muted-foreground text-lg">
+              Analyze URLs for potential phishing threats using advanced security algorithms
             </p>
           </motion.div>
 
-          {/* Risk Score Progress Bar - Always visible */}
-          <div className="mb-6">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm text-muted-foreground">Risk Score</span>
-              <span className={`text-xl font-bold ${
-                progress < 30 ? 'text-green-500' :
-                progress < 50 ? 'text-yellow-500' :
-                progress < 70 ? 'text-orange-500' :
-                progress < 85 ? 'text-red-500' :
-                'text-red-700'
-              }`}>
-                {progress}%
-              </span>
-            </div>
-            <Progress
-              value={progress}
-              className="h-3"
-            />
-            <div className="flex justify-between text-xs text-muted-foreground mt-1">
-              <span>Safe</span>
-              <span>Very High Risk</span>
-            </div>
-          </div>
-
-          {/* Scan Card */}
-          <GlassCard className="p-8 mb-6" hover={false}>
-            <div className="flex gap-3 mb-6">
-              <Input
-                type="url"
-                placeholder="Enter URL to scan (e.g., example.com)"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleScan()}
-                className="text-lg h-14 font-mono"
-              />
-              <Button
-                variant="cyber"
-                size="lg"
-                onClick={handleScan}
-                disabled={isScanning || !url}
-                className="h-14 px-8"
-              >
-                {isScanning ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <>
-                    <Search className="w-5 h-5 mr-2" />
-                    Scan
-                  </>
-                )}
-              </Button>
-            </div>
-
-            {/* Scanning Animation */}
-            <AnimatePresence>
-              {isScanning && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="py-12 text-center"
-                >
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                    className="w-20 h-20 mx-auto mb-6 rounded-full border-4 border-primary/30 border-t-primary"
-                  />
-                  <motion.p
-                    animate={{ opacity: [0.5, 1, 0.5] }}
-                    transition={{ duration: 1.5, repeat: Infinity }}
-                    className="text-muted-foreground"
-                  >
-                    Analyzing URL for threats...
-                  </motion.p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Result */}
-            <AnimatePresence>
-              {result && !isScanning && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  className="mt-6"
-                >
-                  <GlassCard className="p-6">
-                    <div className="text-center">
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ type: "spring", duration: 0.5 }}
-                        className={`w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center ${
-                          result.status === 'SAFE' ? 'bg-green-500/20' : 'bg-red-500/20'
-                        }`}
-                      >
-                        {result.status === 'SAFE' ? (
-                          <CheckCircle className="w-10 h-10 text-green-500" />
-                        ) : (
-                          <XCircle className="w-10 h-10 text-red-500" />
-                        )}
-                      </motion.div>
-
-                      <h3 className={`text-3xl font-bold mb-2 ${
-                        result.status === 'SAFE' ? 'text-green-500' : 'text-red-500'
-                      }`}>
-                        {result.status === 'SAFE' ? 'SAFE' : 'SUSPICIOUS/FAKE'}
-                      </h3>
-
-                      <p className="text-xl text-muted-foreground font-semibold">
-                        Risk Score: {result.riskScore}%
-                      </p>
-                    </div>
-                  </GlassCard>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </GlassCard>
-
-          {/* Back to dashboard */}
+          {/* Input Section */}
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            className="text-center"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
           >
-            <Link to="/dashboard">
-              <Button variant="outline">Return to Dashboard</Button>
-            </Link>
+            <GlassCard className="p-6 mb-6">
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <Input
+                    type="url"
+                    placeholder="Enter URL to scan (e.g., https://example.com)"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    className="text-lg"
+                    disabled={isScanning}
+                  />
+                </div>
+                <Button
+                  onClick={handleScan}
+                  disabled={isScanning || !url.trim()}
+                  size="lg"
+                  className="px-8"
+                >
+                  {isScanning ? (
+                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                  ) : (
+                    <Search className="w-5 h-5 mr-2" />
+                  )}
+                  {isScanning ? "Scanning..." : "Scan URL"}
+                </Button>
+              </div>
+            </GlassCard>
           </motion.div>
+
+          {/* Progress Bar */}
+          <AnimatePresence>
+            {isScanning && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="mb-6"
+              >
+                <GlassCard className="p-6">
+                  <div className="text-center">
+                    <div className="flex items-center justify-center mb-4">
+                      <Shield className="w-8 h-8 text-primary animate-pulse mr-3" />
+                      <span className="text-xl font-semibold">Analyzing URL...</span>
+                    </div>
+                    <Progress value={progress} className="w-full mb-2" />
+                    <p className="text-sm text-muted-foreground">
+                      Performing comprehensive security analysis
+                    </p>
+                  </div>
+                </GlassCard>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Results */}
+          <AnimatePresence>
+            {result && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+              >
+                <GlassCard className="p-6">
+                  {/* Status Header */}
+                  <div className={`p-4 rounded-lg border mb-6 ${getStatusColor(result.status)}`}>
+                    <div className="flex items-center">
+                      {getStatusIcon(result.status)}
+                      <div className="ml-3">
+                        <h3 className="font-semibold text-lg">
+                          {result.status === 'SAFE' ? 'URL Appears Safe' : 'Potential Security Risk'}
+                        </h3>
+                        <p className="text-sm opacity-90">
+                          Risk Level: {result.riskLevel} ({result.riskScore}/100)
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Analysis Details */}
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {/* Basic Info */}
+                    <div>
+                      <h4 className="font-semibold mb-3 flex items-center">
+                        <Globe className="w-4 h-4 mr-2" />
+                        URL Information
+                      </h4>
+                      <div className="space-y-2 text-sm">
+                        <p><span className="font-medium">Domain:</span> {result.analysis.domain}</p>
+                        <p><span className="font-medium">Protocol:</span> {result.analysis.protocol}</p>
+                        <p><span className="font-medium">HTTPS:</span> {result.analysis.hasHttps ? 'Yes' : 'No'}</p>
+                      </div>
+                    </div>
+
+                    {/* Analysis Results */}
+                    <div>
+                      <h4 className="font-semibold mb-3 flex items-center">
+                        <Shield className="w-4 h-4 mr-2" />
+                        Analysis Results
+                      </h4>
+
+                      {result.analysis.suspiciousPatterns.length > 0 && (
+                        <div className="mb-4">
+                          <p className="text-sm font-medium text-red-600 mb-2">Suspicious Patterns:</p>
+                          <ul className="text-sm space-y-1">
+                            {result.analysis.suspiciousPatterns.map((pattern, index) => (
+                              <li key={index} className="flex items-start">
+                                <XCircle className="w-3 h-3 text-red-500 mt-0.5 mr-2 flex-shrink-0" />
+                                {pattern}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {result.analysis.legitimateIndicators.length > 0 && (
+                        <div className="mb-4">
+                          <p className="text-sm font-medium text-green-600 mb-2">Legitimate Indicators:</p>
+                          <ul className="text-sm space-y-1">
+                            {result.analysis.legitimateIndicators.map((indicator, index) => (
+                              <li key={index} className="flex items-start">
+                                <CheckCircle className="w-3 h-3 text-green-500 mt-0.5 mr-2 flex-shrink-0" />
+                                {indicator}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {result.analysis.recommendations.length > 0 && (
+                        <div>
+                          <p className="text-sm font-medium text-blue-600 mb-2">Recommendations:</p>
+                          <ul className="text-sm space-y-1">
+                            {result.analysis.recommendations.map((rec, index) => (
+                              <li key={index} className="flex items-start">
+                                <AlertCircle className="w-3 h-3 text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
+                                {rec}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-3 mt-6 pt-6 border-t">
+                    <Button
+                      onClick={() => {
+                        setUrl("");
+                        setResult(null);
+                        setProgress(0);
+                      }}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      Scan Another URL
+                    </Button>
+                    <Button
+                      onClick={() => navigate("/phishing-dashboard")}
+                      className="flex-1"
+                    >
+                      View Dashboard
+                    </Button>
+                  </div>
+                </GlassCard>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </main>
     </PageTransition>

@@ -43,7 +43,7 @@ class GoogleAuthService {
   }
 
   // Handle the credential response from Google
-  private handleCredentialResponse(response: any) {
+  private handleCredentialResponse(response: { credential: string }) {
     try {
       // Decode the JWT token to get user info
       const payload = JSON.parse(atob(response.credential.split('.')[1]));
@@ -57,7 +57,7 @@ class GoogleAuthService {
       };
 
       // Store the user data temporarily for the callback
-      (window as any).googleAuthUser = user;
+      window.googleAuthUser = user;
     } catch (error) {
       console.error('Error parsing Google credential:', error);
     }
@@ -71,7 +71,7 @@ class GoogleAuthService {
     }
 
     // Set up a callback to handle the sign-in
-    (window as any).googleAuthCallback = (user: GoogleUser) => {
+    window.googleAuthCallback = (user: GoogleUser) => {
       onSuccess(user);
     };
 
@@ -96,7 +96,7 @@ class GoogleAuthService {
       }
 
       // Clear any previous user data
-      (window as any).googleAuthUser = null;
+      window.googleAuthUser = undefined;
 
       // Prompt the user to sign in
       window.google.accounts.id.prompt((notification) => {
@@ -108,7 +108,7 @@ class GoogleAuthService {
 
       // Wait for the credential response
       const checkForUser = () => {
-        const user = (window as any).googleAuthUser;
+        const user = window.googleAuthUser;
         if (user) {
           resolve(user);
         } else {
@@ -121,7 +121,7 @@ class GoogleAuthService {
 
       // Timeout after 30 seconds
       setTimeout(() => {
-        if (!(window as any).googleAuthUser) {
+        if (!window.googleAuthUser) {
           reject(new Error('Google sign-in timeout'));
         }
       }, 30000);
@@ -154,7 +154,30 @@ class GoogleAuthService {
 // Global type declarations for Google Identity Services
 declare global {
   interface Window {
-    google: any;
+    google: {
+      accounts: {
+        id: {
+          initialize: (config: {
+            client_id: string;
+            callback: (response: { credential: string }) => void;
+            auto_select: boolean;
+            cancel_on_tap_outside: boolean;
+          }) => void;
+          renderButton: (element: HTMLElement | null, config: {
+            theme: string;
+            size: string;
+            width: string;
+            text: string;
+            shape: string;
+          }) => void;
+          prompt: (callback?: (notification: { isNotDisplayed: () => boolean; isSkippedMoment: () => boolean }) => void) => void;
+          disableAutoSelect: () => void;
+          revoke: (hint: string, callback: () => void) => void;
+        };
+      };
+    };
+    googleAuthUser?: GoogleUser;
+    googleAuthCallback?: (user: GoogleUser) => void;
   }
 }
 

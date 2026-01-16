@@ -5,8 +5,9 @@ import ParticleBackground from "@/components/effects/ParticleBackground";
 import PageTransition from "@/components/layout/PageTransition";
 import AuthForm from "@/components/forms/AuthForm";
 import { GoogleUser } from "@/utils/googleAuth";
-import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { createUserWithEmailAndPassword, updateProfile, signInWithPopup, GoogleAuthProvider, fetchSignInMethodsForEmail } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 
 import { toast } from "sonner";
 
@@ -54,16 +55,19 @@ const Register = () => {
       console.log("Register success:", user.email);
       toast.success("Account created successfully!");
       navigate("/dashboard");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Register error:", error);
       let errorMessage = "Registration failed";
       
-      if (error.code === 'auth/email-already-in-use') {
-        errorMessage = "An account with this email already exists";
-      } else if (error.code === 'auth/weak-password') {
-        errorMessage = "Password is too weak";
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = "Invalid email address";
+      if (error instanceof Error && 'code' in error) {
+        const firebaseError = error as { code: string };
+        if (firebaseError.code === 'auth/email-already-in-use') {
+          errorMessage = "An account with this email already exists";
+        } else if (firebaseError.code === 'auth/weak-password') {
+          errorMessage = "Password is too weak";
+        } else if (firebaseError.code === 'auth/invalid-email') {
+          errorMessage = "Invalid email address";
+        }
       }
       
       toast.error(errorMessage);
@@ -77,59 +81,50 @@ const Register = () => {
     setIsLoading(true);
 
     try {
-      // Check if Google user already exists
-      const existingUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
-      const userExists = existingUsers.find((user: any) => user.email === googleUser.email);
+      // Check if the email is already registered
+      const signInMethods = await fetchSignInMethodsForEmail(auth, googleUser.email);
 
-      if (userExists) {
-        // User exists, just log them in
-        const mockUser = {
-          uid: googleUser.id,
-          email: googleUser.email,
-          name: googleUser.name,
-          picture: googleUser.picture,
-          provider: 'google',
-          role: 'user',
-          loggedInAt: new Date().toISOString()
-        };
-
-        localStorage.setItem('mockUser', JSON.stringify(mockUser));
-        toast.success(`Welcome back, ${googleUser.name}!`);
-      } else {
-        // Create new user account from Google data
-        const newUser = {
-          uid: googleUser.id,
-          email: googleUser.email,
-          name: googleUser.name,
-          picture: googleUser.picture,
-          provider: 'google',
-          role: 'user',
-          registeredAt: new Date().toISOString()
-        };
-
-        // Store in registered users
-        existingUsers.push(newUser);
-        localStorage.setItem('registeredUsers', JSON.stringify(existingUsers));
-
-        // Auto-login the user
-        const mockUser = {
-          uid: newUser.uid,
-          email: newUser.email,
-          name: newUser.name,
-          picture: newUser.picture,
-          provider: 'google',
-          role: newUser.role,
-          loggedInAt: new Date().toISOString()
-        };
-
-        localStorage.setItem('mockUser', JSON.stringify(mockUser));
-        toast.success(`Account created successfully! Welcome, ${googleUser.name}!`);
+      if (signInMethods.length > 0) {
+        // Email is already registered
+        toast.error("Account already exists. Please login.");
+        setIsLoading(false);
+        return;
       }
 
+      // Email is not registered, proceed with Google sign-in
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // Create user profile in Firestore
+      await setDoc(doc(db, 'users', user.uid), {
+        uid: user.uid,
+        email: user.email,
+        name: user.displayName,
+        picture: user.photoURL,
+        provider: 'google',
+        role: 'user',
+        createdAt: new Date().toISOString(),
+        emailVerified: user.emailVerified
+      });
+
+      console.log("Google register success:", user.email);
+      toast.success("Account created successfully! Welcome!");
       navigate("/dashboard");
     } catch (error: unknown) {
       console.error("Google register error:", error);
-      toast.error("Google registration failed");
+      let errorMessage = "Google registration failed";
+
+      if (error instanceof Error && 'code' in error) {
+        const firebaseError = error as { code: string };
+        if (firebaseError.code === 'auth/popup-closed-by-user') {
+          errorMessage = "Sign-in cancelled";
+        } else if (firebaseError.code === 'auth/popup-blocked') {
+          errorMessage = "Popup blocked by browser";
+        }
+      }
+
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }

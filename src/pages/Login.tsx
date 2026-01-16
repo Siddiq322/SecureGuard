@@ -5,7 +5,7 @@ import ParticleBackground from "@/components/effects/ParticleBackground";
 import PageTransition from "@/components/layout/PageTransition";
 import AuthForm from "@/components/forms/AuthForm";
 import { GoogleUser } from "@/utils/googleAuth";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, fetchSignInMethodsForEmail } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 
 import { toast } from "sonner";
@@ -40,20 +40,23 @@ const Login = () => {
       console.log("Login success:", data.email);
       toast.success("Welcome back!");
       navigate("/dashboard");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Login error:", error);
       let errorMessage = "Login failed";
       
-      if (error.code === 'auth/user-not-found') {
-        errorMessage = "No account found with this email";
-      } else if (error.code === 'auth/wrong-password') {
-        errorMessage = "Invalid password";
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = "Invalid email address";
-      } else if (error.code === 'auth/user-disabled') {
-        errorMessage = "This account has been disabled";
-      } else if (error.code === 'auth/too-many-requests') {
-        errorMessage = "Too many failed login attempts. Please try again later";
+      if (error instanceof Error && 'code' in error) {
+        const firebaseError = error as { code: string };
+        if (firebaseError.code === 'auth/user-not-found') {
+          errorMessage = "No account found with this email";
+        } else if (firebaseError.code === 'auth/wrong-password') {
+          errorMessage = "Invalid password";
+        } else if (firebaseError.code === 'auth/invalid-email') {
+          errorMessage = "Invalid email address";
+        } else if (firebaseError.code === 'auth/user-disabled') {
+          errorMessage = "This account has been disabled";
+        } else if (firebaseError.code === 'auth/too-many-requests') {
+          errorMessage = "Too many failed login attempts. Please try again later";
+        }
       }
       
       toast.error(errorMessage);
@@ -67,42 +70,40 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      // Check if Google user already exists in registered users
-      const existingUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
-      const userExists = existingUsers.find((user: any) => user.email === googleUser.email);
+      // Check if the email is registered
+      const signInMethods = await fetchSignInMethodsForEmail(auth, googleUser.email);
 
-      // Also check valid demo accounts
-      const validAccounts = [
-        { email: "user@cyberguard.com", password: "user123", role: "user" },
-        { email: googleUser.email, password: "demo123", role: "user" }
-      ];
-      const accountExists = validAccounts.find(acc => acc.email === googleUser.email);
-
-      if (!userExists && !accountExists) {
-        toast.error("No account found with this Google email. Please register first or use email/password login.");
+      if (signInMethods.length === 0) {
+        // Email is not registered
+        toast.error("Account not registered. Please sign up first.");
         setIsLoading(false);
         return;
       }
 
-      // Store Google user in localStorage for persistence
-      const mockUser = {
-        uid: googleUser.id,
-        email: googleUser.email,
-        name: googleUser.name,
-        picture: googleUser.picture,
-        provider: 'google',
-        role: 'user',
-        loggedInAt: new Date().toISOString()
-      };
+      // Email is registered, proceed with Google sign-in
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
 
-      localStorage.setItem('mockUser', JSON.stringify(mockUser));
-
-      console.log("Google login success:", mockUser.email);
-      toast.success(`Welcome back, ${googleUser.name}!`);
+      console.log("Google login success:", user.email);
+      toast.success(`Welcome back, ${user.displayName || user.email}!`);
       navigate("/dashboard");
     } catch (error: unknown) {
       console.error("Google login error:", error);
-      toast.error("Google login failed");
+      let errorMessage = "Google login failed";
+
+      if (error instanceof Error && 'code' in error) {
+        const firebaseError = error as { code: string };
+        if (firebaseError.code === 'auth/popup-closed-by-user') {
+          errorMessage = "Sign-in cancelled";
+        } else if (firebaseError.code === 'auth/popup-blocked') {
+          errorMessage = "Popup blocked by browser";
+        } else if (firebaseError.code === 'auth/user-disabled') {
+          errorMessage = "This account has been disabled";
+        }
+      }
+
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
