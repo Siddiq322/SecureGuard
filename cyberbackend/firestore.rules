@@ -1,0 +1,87 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ==========================================
+    // USER PROFILES
+    // ==========================================
+    match /users/{userId} {
+      // Users can read and write their own profile
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // Admins can read all user profiles
+      allow read: if isAdmin();
+
+      // Allow create for new user registration
+      allow create: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ==========================================
+    // PHISHING SUBMISSIONS
+    // ==========================================
+    match /phishing_submissions/{submissionId} {
+      // Users can read and create their own submissions
+      allow read, create: if request.auth != null && request.auth.uid == resource.data.userId;
+
+      // Users can only create submissions for themselves
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+
+      // Admins can read and update all submissions
+      allow read, update: if isAdmin();
+    }
+
+    // ==========================================
+    // MALWARE SUBMISSIONS
+    // ==========================================
+    match /malware_submissions/{submissionId} {
+      // Users can read and create their own submissions
+      allow read, create: if request.auth != null && request.auth.uid == resource.data.userId;
+
+      // Users can only create submissions for themselves
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+
+      // Admins can read and update all submissions
+      allow read, update: if isAdmin();
+    }
+
+    // ==========================================
+    // PASSWORD CHECK LOGS
+    // ==========================================
+    match /password_checks/{checkId} {
+      // Users can only create and read their own password checks
+      allow read, create: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+
+      // Admins can read all password checks
+      allow read: if isAdmin();
+    }
+
+    // ==========================================
+    // LEGACY COLLECTIONS (for backward compatibility)
+    // ==========================================
+    match /phishing_logs/{logId} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+    }
+
+    // ==========================================
+    // ADMIN DECISIONS LOG
+    // ==========================================
+    match /admin_decisions/{decisionId} {
+      // Only admins can read/write admin decisions
+      allow read, write: if isAdmin();
+    }
+  }
+
+  // ==========================================
+  // HELPER FUNCTIONS
+  // ==========================================
+  function isAdmin() {
+    return request.auth != null &&
+           exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+  }
+
+  function isAuthenticatedUser() {
+    return request.auth != null;
+  }
+}
