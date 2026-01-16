@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Shield, Menu, X, LogOut, Settings, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { onAuthStateChanged, signOut, User as FirebaseUser } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { toast } from "sonner";
 
 interface NavbarProps {
   isAuthenticated?: boolean;
@@ -12,20 +15,28 @@ interface NavbarProps {
 
 const Navbar = ({ isAuthenticated = false, onLogout }: NavbarProps) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<FirebaseUser | null>(null);
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    // Get user data from localStorage
-    const userData = localStorage.getItem('mockUser');
-    if (userData) {
-      try {
-        setUser(JSON.parse(userData));
-      } catch (error) {
-        console.error('Error parsing user data:', error);
-      }
-    }
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser);
+    });
+
+    return () => unsubscribe();
   }, []);
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      toast.success("Logged out successfully");
+      navigate("/login");
+    } catch (error) {
+      console.error("Logout error:", error);
+      toast.error("Logout failed");
+    }
+  };
 
   const navLinks = isAuthenticated
     ? [
@@ -93,7 +104,7 @@ const Navbar = ({ isAuthenticated = false, onLogout }: NavbarProps) => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={onLogout}
+                  onClick={handleLogout}
                   className="text-muted-foreground hover:text-destructive"
                 >
                   <LogOut className="w-4 h-4" />
@@ -164,7 +175,7 @@ const Navbar = ({ isAuthenticated = false, onLogout }: NavbarProps) => {
                     <button
                       onClick={() => {
                         setIsOpen(false);
-                        onLogout?.();
+                        handleLogout();
                       }}
                       className="w-full text-left px-4 py-3 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors"
                     >

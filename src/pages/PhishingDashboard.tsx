@@ -259,7 +259,7 @@ Final Assessment: ${riskLevel} (${riskScore}% risk)`;
   return (
     <PageTransition>
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-        <Navbar isAuthenticated={true} onLogout={() => navigate("/login")} />
+        <Navbar isAuthenticated={true} />
         <ParticleBackground />
 
         <main className="pt-24 pb-12 px-4">

@@ -5,6 +5,8 @@ import ParticleBackground from "@/components/effects/ParticleBackground";
 import PageTransition from "@/components/layout/PageTransition";
 import AuthForm from "@/components/forms/AuthForm";
 import { GoogleUser } from "@/utils/googleAuth";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 import { toast } from "sonner";
 
@@ -23,12 +25,6 @@ const Login = () => {
       return;
     }
 
-    if (data.password.length < 6) {
-      toast.error("Password must be at least 6 characters long");
-      setIsLoading(false);
-      return;
-    }
-
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(data.email)) {
@@ -37,46 +33,30 @@ const Login = () => {
       return;
     }
 
-    // Mock authentication - check against predefined accounts and registered users
-    const validAccounts = [
-      { email: "user@cyberguard.com", password: "user123", role: "user" },
-      // Allow any email with password "demo123" for testing
-      { email: data.email, password: "demo123", role: "user" }
-    ];
-
-    // Check registered users
-    const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
-    const registeredUser = registeredUsers.find((user: any) =>
-      user.email === data.email && user.password === data.password
-    );
-
-    const account = registeredUser || validAccounts.find(acc =>
-      acc.email === data.email && acc.password === data.password
-    );
-
-    if (!account) {
-      toast.error("Invalid email or password");
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      // Store user in localStorage for persistence
-      const mockUser = {
-        uid: `user_${Date.now()}`,
-        email: data.email,
-        role: account.role,
-        loggedInAt: new Date().toISOString()
-      };
+      // Sign in with Firebase Auth
+      await signInWithEmailAndPassword(auth, data.email, data.password);
 
-      localStorage.setItem('mockUser', JSON.stringify(mockUser));
-
-      console.log("Login success:", mockUser.email);
+      console.log("Login success:", data.email);
       toast.success("Welcome back!");
       navigate("/dashboard");
-    } catch (error: unknown) {
+    } catch (error: any) {
       console.error("Login error:", error);
-      toast.error("Login failed");
+      let errorMessage = "Login failed";
+      
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = "No account found with this email";
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = "Invalid password";
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = "Invalid email address";
+      } else if (error.code === 'auth/user-disabled') {
+        errorMessage = "This account has been disabled";
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = "Too many failed login attempts. Please try again later";
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }

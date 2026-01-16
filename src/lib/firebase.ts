@@ -1,6 +1,4 @@
-// Firebase configuration (kept for potential future use)
-// Currently using localStorage-based authentication
-
+// Firebase configuration
 export const firebaseConfig = {
   apiKey: "AIzaSyAPhGKVwWJvsEQ7FexP3I1MxVIVSiRv9XQ",
   authDomain: "sphere-80f53.firebaseapp.com",
@@ -11,10 +9,6 @@ export const firebaseConfig = {
   measurementId: "G-XY9SD0E09X",
 };
 
-// Note: Firebase is not currently used - using localStorage for authentication
-// Uncomment below if you want to switch back to Firebase auth
-
-/*
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
@@ -24,4 +18,3 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 export { app, auth, db };
-*/

@@ -1,29 +1,30 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
+import { onAuthStateChanged, User } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 interface AuthGuardProps {
   children: React.ReactNode;
 }
 
 const AuthGuard = ({ children }: AuthGuardProps) => {
-  const [user, setUser] = useState<{ uid: string; email: string; loggedInAt: string } | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check for logged-in user in localStorage
-    const storedUser = localStorage.getItem('mockUser');
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setUser(firebaseUser);
+      } else {
+        setUser(null);
+        navigate("/login");
+      }
+      setLoading(false);
+    });
 
-    if (storedUser) {
-      const mockUser = JSON.parse(storedUser);
-      setUser(mockUser);
-      setLoading(false);
-    } else {
-      // No user logged in, redirect to login
-      navigate("/login");
-      setLoading(false);
-    }
+    return () => unsubscribe();
   }, [navigate]);
 
   if (loading) {

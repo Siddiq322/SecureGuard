@@ -37,7 +37,7 @@ const PasswordDashboard = () => {
   return (
     <PageTransition>
       <ParticleBackground />
-      <Navbar isAuthenticated onLogout={() => { localStorage.removeItem('mockUser'); navigate("/login"); }} />
+<Navbar isAuthenticated />
 
       <main className="relative z-10 min-h-screen pt-24 pb-12 px-4">
         <div className="container mx-auto max-w-6xl">

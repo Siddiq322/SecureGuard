@@ -5,6 +5,8 @@ import ParticleBackground from "@/components/effects/ParticleBackground";
 import PageTransition from "@/components/layout/PageTransition";
 import AuthForm from "@/components/forms/AuthForm";
 import { GoogleUser } from "@/utils/googleAuth";
+import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 import { toast } from "sonner";
 
@@ -37,48 +39,34 @@ const Register = () => {
       return;
     }
 
-    // Check if user already exists (in localStorage for demo)
-    const existingUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
-    const userExists = existingUsers.find((user: any) => user.email === data.email);
-
-    if (userExists) {
-      toast.error("An account with this email already exists");
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      // Create new user account
-      const newUser = {
-        uid: `user_${Date.now()}`,
-        email: data.email,
-        name: data.name,
-        password: data.password, // In real app, this would be hashed
-        role: 'user',
-        registeredAt: new Date().toISOString()
-      };
+      // Create user with Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      const user = userCredential.user;
 
-      // Store in registered users (for demo purposes)
-      existingUsers.push(newUser);
-      localStorage.setItem('registeredUsers', JSON.stringify(existingUsers));
+      // Update the user profile with display name
+      if (data.name) {
+        await updateProfile(user, {
+          displayName: data.name
+        });
+      }
 
-      // Auto-login the user
-      const mockUser = {
-        uid: newUser.uid,
-        email: newUser.email,
-        name: newUser.name,
-        role: newUser.role,
-        loggedInAt: new Date().toISOString()
-      };
-
-      localStorage.setItem('mockUser', JSON.stringify(mockUser));
-
-      console.log("Register success:", mockUser.email);
+      console.log("Register success:", user.email);
       toast.success("Account created successfully!");
       navigate("/dashboard");
-    } catch (error: unknown) {
+    } catch (error: any) {
       console.error("Register error:", error);
-      toast.error("Registration failed");
+      let errorMessage = "Registration failed";
+      
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = "An account with this email already exists";
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = "Password is too weak";
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = "Invalid email address";
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }

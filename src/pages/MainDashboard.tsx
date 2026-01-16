@@ -6,31 +6,39 @@ import Navbar from "@/components/layout/Navbar";
 import ParticleBackground from "@/components/effects/ParticleBackground";
 import PageTransition from "@/components/layout/PageTransition";
 import DashboardCard from "@/components/cards/DashboardCard";
+import { onAuthStateChanged, signOut, User } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { toast } from "sonner";
 
 const MainDashboard = () => {
   const navigate = useNavigate();
-  const [user, setUser] = useState<{ uid: string; email: string; loggedInAt: string } | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log("Checking localStorage for user");
-    const storedUser = localStorage.getItem('mockUser');
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        console.log("User authenticated:", firebaseUser.email);
+        setUser(firebaseUser);
+      } else {
+        console.log("No authenticated user, redirecting to login");
+        navigate("/login");
+      }
+      setLoading(false);
+    });
 
-    if (storedUser) {
-      const mockUser = JSON.parse(storedUser);
-      console.log("User found in localStorage:", mockUser.email);
-      setUser(mockUser);
-      setLoading(false);
-    } else {
-      console.log("No user in localStorage, redirecting to login");
-      navigate("/login");
-      setLoading(false);
-    }
+    return () => unsubscribe();
   }, [navigate]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('mockUser');
-    navigate("/login");
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      toast.success("Logged out successfully");
+      navigate("/login");
+    } catch (error) {
+      console.error("Logout error:", error);
+      toast.error("Logout failed");
+    }
   };
 
   if (loading) {
